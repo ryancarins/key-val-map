@@ -2,15 +2,16 @@
 
 use std::collections::HashMap;
 use std::hash::Hash;
+use std::rc::Rc;
 
 pub struct KeyValMap<K: Eq + Hash + Clone, V: Eq + Hash + Clone> {
-    keys: HashMap<K, V>,
-    vals: HashMap<V, K>,
+    keys: HashMap<Rc<K>, Rc<V>>,
+    vals: HashMap<Rc<V>, Rc<K>>,
 }
 
 #[derive(Debug)]
 pub enum KeyValMapError {
-    InsertError
+    InsertError,
 }
 
 impl<K: Eq + Hash + Clone, V: Eq + Hash + Clone> KeyValMap<K, V> {
@@ -20,21 +21,33 @@ impl<K: Eq + Hash + Clone, V: Eq + Hash + Clone> KeyValMap<K, V> {
             vals: HashMap::new(),
         }
     }
-    pub fn insert(&mut self, key: K, val: V) -> Result<(),KeyValMapError> {
+    pub fn insert(&mut self, key: K, val: V) -> Result<(), KeyValMapError> {
         if self.keys.contains_key(&key) || self.vals.contains_key(&val) {
             return Err(KeyValMapError::InsertError);
         }
-        self.keys.insert(key.clone(), val.clone());
-        self.vals.insert(val, key);
+        let keyrc = Rc::new(key);
+        let valrc = Rc::new(val);
+        self.keys.insert(keyrc.clone(), valrc.clone());
+        self.vals.insert(valrc, keyrc);
         Ok(())
     }
 
     pub fn get_by_key(&self, key: &K) -> Option<V> {
-        self.keys.get(key).cloned()
+        let inner_val = self.keys.get(key);
+        if inner_val.is_none() {
+            return None;
+        }
+
+        Some((**inner_val.unwrap()).clone())
     }
 
     pub fn get_by_val(&self, val: &V) -> Option<K> {
-        self.vals.get(val).cloned()
+        let inner_key = self.vals.get(val);
+        if inner_key.is_none() {
+            return None;
+        }
+
+        Some((**inner_key.unwrap()).clone())
     }
 
     pub fn remove_by_key(&mut self, key: &K) -> Option<V> {
@@ -43,7 +56,7 @@ impl<K: Eq + Hash + Clone, V: Eq + Hash + Clone> KeyValMap<K, V> {
             return None;
         }
         self.vals.remove(&val.clone().unwrap());
-        return val;
+        Some((*val.unwrap()).clone())
     }
 
     pub fn remove_by_val(&mut self, val: &V) -> Option<K> {
@@ -52,13 +65,13 @@ impl<K: Eq + Hash + Clone, V: Eq + Hash + Clone> KeyValMap<K, V> {
             return None;
         }
         self.keys.remove(&key.clone().unwrap());
-        return key;
+        Some((*key.unwrap()).clone())
     }
 
     pub fn to_key_vec(&self) -> Vec<K> {
         let mut key_vec: Vec<K> = Vec::new();
         for key in self.keys.keys() {
-            key_vec.push(key.clone());
+            key_vec.push((*key.clone()).clone());
         }
         return key_vec;
     }
@@ -66,7 +79,7 @@ impl<K: Eq + Hash + Clone, V: Eq + Hash + Clone> KeyValMap<K, V> {
     pub fn to_val_vec(&self) -> Vec<V> {
         let mut val_vec: Vec<V> = Vec::new();
         for key in self.vals.keys() {
-            val_vec.push(key.clone());
+            val_vec.push((*key.clone()).clone());
         }
         return val_vec;
     }
@@ -80,6 +93,6 @@ impl<K: Eq + Hash + Clone, V: Eq + Hash + Clone> KeyValMap<K, V> {
     }
 
     pub fn contains(&self, key: &K, val: &V) -> bool {
-        return self.contains_val(val) && self.contains_key(key)
+        return self.contains_val(val) && self.contains_key(key);
     }
 }
